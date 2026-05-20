@@ -385,9 +385,7 @@ int AAS_LoadAASFile(char *filename)
 	aasworld.bspchecksum = atoi(LibVarGetString( "sv_mapChecksum"));
 	if (LittleLong(header.bspchecksum) != aasworld.bspchecksum)
 	{
-		AAS_Error("aas file %s is out of date\n", filename);
-		botimport.FS_FCloseFile(fp);
-		return BLERR_WRONGAASFILEVERSION;
+		botimport.Print(PRT_WARNING, "aas file %s might be out of date (bsp checksum mismatch)\n", filename);
 	} //end if
 	//load the lumps:
 	//bounding boxes
