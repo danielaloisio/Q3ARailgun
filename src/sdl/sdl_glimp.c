@@ -216,9 +216,9 @@ static void HandleEvents(void)
 
         case SDL_WINDOWEVENT:
             if (ev.window.event == SDL_WINDOWEVENT_FOCUS_LOST)
-                IN_DeactivateMouse();
-            else if (ev.window.event == SDL_WINDOWEVENT_FOCUS_GAINED)
                 IN_ActivateMouse();
+            else if (ev.window.event == SDL_WINDOWEVENT_FOCUS_GAINED)
+                IN_DeactivateMouse();
             break;
 
         case SDL_QUIT:
