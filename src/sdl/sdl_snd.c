@@ -164,7 +164,6 @@ void SNDDMA_Submit(void)
 }
 
 #ifdef __linux__
-/* Snd_Memset — glibc memset bug workaround, linux only */
 void Snd_Memset(void *dest, const int val, const size_t count)
 {
     Com_Memset(dest, val, count);

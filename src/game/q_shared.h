@@ -215,8 +215,6 @@ static inline float LittleFloat (const float l) { return FloatSwap(&l); }
 
 #endif
 
-//======================= APPLE (modern macOS) DEFINES =================
-
 #if defined(__APPLE__) && !defined(MACOS_X) && !defined(__MACOS__)
 
 #define stricmp strcasecmp
