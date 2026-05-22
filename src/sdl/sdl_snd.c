@@ -163,8 +163,9 @@ void SNDDMA_Submit(void)
         SDL_UnlockAudioDevice(sdl_audio_dev);
 }
 
-/* Snd_Memset — keep the same override used in the original linux port */
+#ifdef __linux__
 void Snd_Memset(void *dest, const int val, const size_t count)
 {
     Com_Memset(dest, val, count);
 }
+#endif

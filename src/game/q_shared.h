@@ -215,6 +215,32 @@ static inline float LittleFloat (const float l) { return FloatSwap(&l); }
 
 #endif
 
+#if defined(__APPLE__) && !defined(MACOS_X) && !defined(__MACOS__)
+
+#define stricmp strcasecmp
+
+#define MAC_STATIC
+#define ID_INLINE inline
+
+#ifdef __aarch64__
+#define CPUSTRING "macos-arm64"
+#elif defined __x86_64__
+#define CPUSTRING "macos-x86_64"
+#else
+#define CPUSTRING "macos-other"
+#endif
+
+#define PATH_SEP '/'
+
+inline static short BigShort( short l) { return ShortSwap(l); }
+#define LittleShort
+inline static int BigLong(int l) { return LongSwap(l); }
+#define LittleLong
+inline static float BigFloat(const float *l) { return FloatSwap(l); }
+#define LittleFloat
+
+#endif
+
 //======================= MAC DEFINES =================================
 
 #ifdef __MACOS__
