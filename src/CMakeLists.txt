@@ -154,7 +154,7 @@ set(PLATFORM_SRCS
     sdl/sdl_snd.c
 )
 
-if(NOT APPLE)
+if(NOT APPLE AND NOT WIN32)
     list(APPEND PLATFORM_SRCS unix/linux_common.c)
 endif()
 
@@ -179,16 +179,19 @@ target_include_directories(Q3ARailgun PRIVATE
     ${OPENGL_INCLUDE_DIR}
 )
 
-target_link_libraries(Q3ARailgun PRIVATE
-    renderer
-    botlib
-    jpeg6
-    ${SDL2_LIBRARIES}
-    ${OPENGL_LIBRARIES}
-    m
-    dl
-    pthread
-)
+if(WIN32)
+    target_link_libraries(Q3ARailgun PRIVATE
+        renderer botlib jpeg6
+        ${SDL2_LIBRARIES} ${OPENGL_LIBRARIES}
+        ws2_32
+    )
+else()
+    target_link_libraries(Q3ARailgun PRIVATE
+        renderer botlib jpeg6
+        ${SDL2_LIBRARIES} ${OPENGL_LIBRARIES}
+        m dl pthread
+    )
+endif()
 
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "i.86|x86_64")
     target_compile_definitions(Q3ARailgun PRIVATE id386)

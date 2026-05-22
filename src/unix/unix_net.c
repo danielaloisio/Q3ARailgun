@@ -24,17 +24,26 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../game/q_shared.h"
 #include "../qcommon/qcommon.h"
 
+#ifndef _WIN32
 #include <unistd.h>
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <netinet/in.h>
 #include <netdb.h>
 #include <arpa/inet.h> // bk001204
-
 #include <sys/param.h>
 #include <sys/ioctl.h>
 #include <sys/uio.h>
 #include <errno.h>
+#else
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <errno.h>
+#define ioctl(s,r,a)    ioctlsocket(s,r,(u_long*)(a))
+#define close(s)        closesocket(s)
+#define EWOULDBLOCK     WSAEWOULDBLOCK
+#define ECONNREFUSED    WSAECONNREFUSED
+#endif
 
 #ifdef MACOS_X
 #import <sys/sockio.h>
@@ -184,7 +193,11 @@ qboolean	Sys_GetPacket (netadr_t *net_from, msg_t *net_message)
 
 		if (ret == -1)
 		{
+#ifdef _WIN32
+			err = WSAGetLastError();
+#else
 			err = errno;
+#endif
 
 			if (err == EWOULDBLOCK || err == ECONNREFUSED)
 				continue;
@@ -500,6 +513,11 @@ NET_Init
 */
 void NET_Init (void)
 {
+#ifdef _WIN32
+	WSADATA wsa;
+	if ( WSAStartup( MAKEWORD(2,2), &wsa ) != 0 )
+		Com_Error( ERR_FATAL, "NET_Init: WSAStartup failed\n" );
+#endif
 	noudp = Cvar_Get ("net_noudp", "0", 0);
 	// open sockets
 	if (! noudp->value) {
@@ -579,6 +597,9 @@ void	NET_Shutdown (void)
 		close(ip_socket);
 		ip_socket = 0;
 	}
+#ifdef _WIN32
+	WSACleanup();
+#endif
 }
 
 
@@ -589,10 +610,17 @@ NET_ErrorString
 */
 char *NET_ErrorString (void)
 {
+#ifndef _WIN32
 	int		code;
 
 	code = errno;
 	return strerror (code);
+#else
+	static char buf[64];
+	int code = WSAGetLastError();
+	snprintf(buf, sizeof(buf), "WSA error %d", code);
+	return buf;
+#endif
 }
 
 // sleeps msec or until net socket is ready
@@ -606,8 +634,10 @@ void NET_Sleep(int msec)
 		return; // we're not a server, just run full speed
 
 	FD_ZERO(&fdset);
+#ifndef _WIN32
 	if (stdin_active)
-		FD_SET(0, &fdset); // stdin is processed too
+		FD_SET(0, &fdset); // stdin is processed too (POSIX only)
+#endif
 	FD_SET(ip_socket, &fdset); // network socket
 	timeout.tv_sec = msec/1000;
 	timeout.tv_usec = (msec%1000)*1000;

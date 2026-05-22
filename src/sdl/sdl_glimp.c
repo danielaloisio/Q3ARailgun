@@ -32,7 +32,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <SDL2/SDL_opengl.h>
 #include <stdio.h>
 #include <string.h>
+#ifndef _WIN32
 #include <dlfcn.h>
+#endif
 
 #include "../renderer/tr_local.h"
 #include "../client/client.h"
@@ -422,7 +424,9 @@ void GLimp_Shutdown(void)
     SDL_QuitSubSystem(SDL_INIT_VIDEO);
 
     if (glw_state.OpenGLLib) {
+#ifndef _WIN32
         dlclose(glw_state.OpenGLLib);
+#endif
         glw_state.OpenGLLib = NULL;
     }
 }
