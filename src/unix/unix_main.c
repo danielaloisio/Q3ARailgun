@@ -25,29 +25,38 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <limits.h>
 #include <sys/time.h>
 #include <sys/types.h>
-#include <unistd.h>
 #include <fcntl.h>
 #include <stdarg.h>
 #include <stdio.h>
+#ifndef _WIN32
 #include <sys/ipc.h>
 #include <sys/shm.h>
+#endif
 #include <sys/stat.h>
 #include <string.h>
 #include <ctype.h>
+#ifndef _WIN32
 #include <sys/wait.h>
 #include <sys/mman.h>
+#endif
 #include <errno.h>
-#ifdef __linux__ // rb010123
+#ifdef __linux__
   #include <mntent.h>
 #endif
+#ifndef _WIN32
 #include <dlfcn.h>
-
-#ifdef __linux__
-  #include <fpu_control.h> // bk001213 - force dumps on divide by zero
 #endif
 
-// FIXME TTimo should we gard this? most *nix system should comply?
+#ifdef __linux__
+  #include <fpu_control.h>
+#endif
+
+#ifndef _WIN32
 #include <termios.h>
+#else
+#include <windows.h>
+#include <SDL2/SDL.h>
+#endif
 
 #include "../game/q_shared.h"
 #include "../qcommon/qcommon.h"
@@ -60,7 +69,9 @@ extern refexport_t re;
 
 unsigned  sys_frame_time;
 
+#ifndef _WIN32
 uid_t saved_euid;
+#endif
 qboolean stdin_active = qtrue;
 
 // =============================================================
@@ -68,29 +79,18 @@ qboolean stdin_active = qtrue;
 // =============================================================
 
 // enable/disabled tty input mode
-// NOTE TTimo this is used during startup, cannot be changed during run
 static cvar_t *ttycon = NULL;
-// general flag to tell about tty console mode
 static qboolean ttycon_on = qfalse;
-// when printing general stuff to stdout stderr (Sys_Printf)
-//   we need to disable the tty console stuff
-// this increments so we can recursively disable
 static int ttycon_hide = 0;
-// some key codes that the terminal may be using
-// TTimo NOTE: I'm not sure how relevant this is
+#ifndef _WIN32
 static int tty_erase;
 static int tty_eof;
-
 static struct termios tty_tc;
-
 static field_t tty_con;
-
-// history
-// NOTE TTimo this is a bit duplicate of the graphical console history
-//   but it's safer and faster to write our own here
 #define TTY_HISTORY 32
 static field_t ttyEditLines[TTY_HISTORY];
 static int hist_current = -1, hist_count = 0;
+#endif
 
 // =======================================================================
 // General routines
@@ -160,77 +160,48 @@ void Sys_In_Restart_f( void )
 //   so we provide tty_Clear and tty_Show to be called before and after a stdout or stderr output
 // =============================================================
 
-// flush stdin, I suspect some terminals are sending a LOT of shit
-// FIXME TTimo relevant?
+#ifndef _WIN32
 void tty_FlushIn()
 {
   char key;
   while (read(0, &key, 1)!=-1);
 }
 
-// do a backspace
-// TTimo NOTE: it seems on some terminals just sending '\b' is not enough
-//   so for now, in any case we send "\b \b" .. yeah well ..
-//   (there may be a way to find out if '\b' alone would work though)
 void tty_Back()
 {
   char key;
-  key = '\b';
-  write(1, &key, 1);
-  key = ' ';
-  write(1, &key, 1);
-  key = '\b';
-  write(1, &key, 1);
+  key = '\b'; write(1, &key, 1);
+  key = ' ';  write(1, &key, 1);
+  key = '\b'; write(1, &key, 1);
 }
 
-// clear the display of the line currently edited
-// bring cursor back to beginning of line
 void tty_Hide()
 {
   int i;
   assert(ttycon_on);
-  if (ttycon_hide)
-  {
-    ttycon_hide++;
-    return;
-  }
+  if (ttycon_hide) { ttycon_hide++; return; }
   if (tty_con.cursor>0)
-  {
-    for (i=0; i<tty_con.cursor; i++)
-    {
-      tty_Back();
-    }
-  }
+    for (i=0; i<tty_con.cursor; i++) tty_Back();
   ttycon_hide++;
 }
 
-// show the current line
-// FIXME TTimo need to position the cursor if needed??
 void tty_Show()
 {
   int i;
   assert(ttycon_on);
   assert(ttycon_hide>0);
   ttycon_hide--;
-  if (ttycon_hide == 0)
-  {
-    if (tty_con.cursor)
-    {
-      for (i=0; i<tty_con.cursor; i++)
-      {
-        write(1, tty_con.buffer+i, 1);
-      }
-    }
-  }
+  if (ttycon_hide == 0 && tty_con.cursor)
+    for (i=0; i<tty_con.cursor; i++)
+      write(1, tty_con.buffer+i, 1);
 }
 
-// never exit without calling this, or your terminal will be left in a pretty bad state
 void Sys_ConsoleInputShutdown()
 {
   if (ttycon_on)
   {
     Com_Printf("Shutdown tty console\n");
-    tcsetattr (0, TCSADRAIN, &tty_tc);
+    tcsetattr(0, TCSADRAIN, &tty_tc);
   }
 }
 
@@ -241,17 +212,11 @@ void Hist_Add(field_t *field)
   assert(hist_count >= 0);
   assert(hist_current >= -1);
   assert(hist_current <= hist_count);
-  // make some room
   for (i=TTY_HISTORY-1; i>0; i--)
-  {
     ttyEditLines[i] = ttyEditLines[i-1];
-  }
   ttyEditLines[0] = *field;
-  if (hist_count<TTY_HISTORY)
-  {
-    hist_count++;
-  }
-  hist_current = -1; // re-init
+  if (hist_count<TTY_HISTORY) hist_count++;
+  hist_current = -1;
 }
 
 field_t *Hist_Prev()
@@ -262,10 +227,7 @@ field_t *Hist_Prev()
   assert(hist_current >= -1);
   assert(hist_current <= hist_count);
   hist_prev = hist_current + 1;
-  if (hist_prev >= hist_count)
-  {
-    return NULL;
-  }
+  if (hist_prev >= hist_count) return NULL;
   hist_current++;
   return &(ttyEditLines[hist_current]);
 }
@@ -276,16 +238,13 @@ field_t *Hist_Next()
   assert(hist_count >= 0);
   assert(hist_current >= -1);
   assert(hist_current <= hist_count);
-  if (hist_current >= 0)
-  {
-    hist_current--;
-  }
-  if (hist_current == -1)
-  {
-    return NULL;
-  }
+  if (hist_current >= 0) hist_current--;
+  if (hist_current == -1) return NULL;
   return &(ttyEditLines[hist_current]);
 }
+#else
+void Sys_ConsoleInputShutdown() {}
+#endif
 
 // =============================================================
 // general sys routines
@@ -317,19 +276,14 @@ void Sys_Printf (char *fmt, ...)
 }
 #endif
 
-// single exit point (regular exit or in case of signal fault)
 void Sys_Exit( int ex ) {
+#ifndef _WIN32
   Sys_ConsoleInputShutdown();
+#endif
 
-#ifdef NDEBUG // regular behavior
-
-  // We can't do this 
-  //  as long as GL DLL's keep installing with atexit...
-  //exit(ex);
+#ifdef NDEBUG
   _exit(ex);
 #else
-
-  // Give me a backtrace on error exits.
   assert( ex == 0 );
   exit(ex);
 #endif
@@ -338,7 +292,9 @@ void Sys_Exit( int ex ) {
 
 void Sys_Quit (void) {
   CL_Shutdown ();
+#ifndef _WIN32
   fcntl (0, F_SETFL, fcntl (0, F_GETFL, 0) & ~FNDELAY);
+#endif
   Sys_Exit(0);
 }
 
@@ -391,10 +347,11 @@ void Sys_Init(void)
 }
 
 void  Sys_Error( const char *error, ...)
-{ 
+{
   va_list     argptr;
   char        string[1024];
 
+#ifndef _WIN32
   // change stdin to non blocking
   // NOTE TTimo not sure how well that goes with tty console mode
   fcntl (0, F_SETFL, fcntl (0, F_GETFL, 0) & ~FNDELAY);
@@ -404,6 +361,7 @@ void  Sys_Error( const char *error, ...)
   {
     tty_Hide();
   }
+#endif
 
   CL_Shutdown ();
 
@@ -416,7 +374,7 @@ void  Sys_Error( const char *error, ...)
 } 
 
 void Sys_Warn (char *warning, ...)
-{ 
+{
   va_list     argptr;
   char        string[1024];
 
@@ -424,17 +382,21 @@ void Sys_Warn (char *warning, ...)
   vsprintf (string,warning,argptr);
   va_end (argptr);
 
+#ifndef _WIN32
   if (ttycon_on)
   {
     tty_Hide();
   }
+#endif
 
   fprintf(stderr, "Warning: %s", string);
 
+#ifndef _WIN32
   if (ttycon_on)
   {
     tty_Show();
   }
+#endif
 } 
 
 /*
@@ -462,6 +424,7 @@ void floating_point_exception_handler(int whatever)
 // initialize the console input (tty mode if wanted and possible)
 void Sys_ConsoleInputInit()
 {
+#ifndef _WIN32
   struct termios tc;
 
   // TTimo 
@@ -509,8 +472,12 @@ void Sys_ConsoleInputInit()
     ttycon_on = qtrue;
   } else
     ttycon_on = qfalse;
+#else
+  ttycon_on = qfalse;
+#endif
 }
 
+#ifndef _WIN32
 char *Sys_ConsoleInput(void)
 {
   // we use this when sending back commands
@@ -663,6 +630,12 @@ char *Sys_ConsoleInput(void)
     return text;
   }
 }
+#else
+char *Sys_ConsoleInput(void)
+{
+  return NULL;
+}
+#endif
 
 /*****************************************************************************/
 
@@ -673,6 +646,7 @@ Sys_UnloadDll
 =================
 */
 void Sys_UnloadDll( void *dllHandle ) {
+#ifndef _WIN32
   // bk001206 - verbose error reporting
   const char* err; // rb010123 - now const
   if ( !dllHandle )
@@ -684,6 +658,15 @@ void Sys_UnloadDll( void *dllHandle ) {
   err = dlerror();
   if ( err != NULL )
     Com_Printf ( "Sys_UnloadGame failed on dlclose: \"%s\"!\n", err );
+#else
+  if ( !dllHandle )
+  {
+    Com_Printf("Sys_UnloadDll(NULL)\n");
+    return;
+  }
+  if ( !FreeLibrary( (HMODULE)dllHandle ) )
+    Com_Printf( "Sys_UnloadDll FreeLibrary failed: error %lu\n", GetLastError() );
+#endif
 }
 
 
@@ -722,7 +705,9 @@ void *Sys_LoadDll( const char *name, char *fqpath ,
   assert( name );
 
   getcwd(curpath, sizeof(curpath));
-#if defined __x86_64__ || defined __amd64__
+#ifdef _WIN32
+  snprintf (fname, sizeof(fname), "%sx86_64.dll", name);
+#elif defined __x86_64__ || defined __amd64__
   snprintf (fname, sizeof(fname), "%sx86_64.so", name);
 #elif defined __i386__
   snprintf (fname, sizeof(fname), "%si386.so", name);
@@ -738,13 +723,14 @@ void *Sys_LoadDll( const char *name, char *fqpath ,
 #error Unknown arch
 #endif
 
-// bk001129 - was RTLD_LAZY 
-#define Q_RTLD    RTLD_NOW
-
   pwdpath = Sys_Cwd();
   basepath = Cvar_VariableString( "fs_basepath" );
   homepath = Cvar_VariableString( "fs_homepath" );
   gamedir = Cvar_VariableString( "fs_game" );
+
+#ifndef _WIN32
+// bk001129 - was RTLD_LAZY
+#define Q_RTLD    RTLD_NOW
 
   // pwdpath
   fn = FS_BuildOSPath( pwdpath, gamedir, fname );
@@ -780,9 +766,9 @@ void *Sys_LoadDll( const char *name, char *fqpath ,
     } else
       Com_Printf ( "Sys_LoadDll(%s): succeeded ...\n", fn );
   } else
-    Com_Printf ( "Sys_LoadDll(%s): succeeded ...\n", fn ); 
+    Com_Printf ( "Sys_LoadDll(%s): succeeded ...\n", fn );
 
-  dllEntry = dlsym( libHandle, "dllEntry" ); 
+  dllEntry = dlsym( libHandle, "dllEntry" );
   *entryPoint = dlsym( libHandle, "vmMain" );
   if ( !*entryPoint || !dllEntry )
   {
@@ -798,6 +784,54 @@ void *Sys_LoadDll( const char *name, char *fqpath ,
       Com_Printf ( "Sys_LoadDll(%s) failed dlcose:\n\"%s\"\n", name, err );
     return NULL;
   }
+#else // _WIN32
+  fn = FS_BuildOSPath( pwdpath, gamedir, fname );
+  Com_Printf( "Sys_LoadDll(%s)... \n", fn );
+  libHandle = (void*)LoadLibraryA( fn );
+
+  if ( !libHandle )
+  {
+    Com_Printf( "Sys_LoadDll(%s) failed (error %lu)\n", fn, GetLastError() );
+    fn = FS_BuildOSPath( homepath, gamedir, fname );
+    Com_Printf( "Sys_LoadDll(%s)... \n", fn );
+    libHandle = (void*)LoadLibraryA( fn );
+
+    if ( !libHandle )
+    {
+      Com_Printf( "Sys_LoadDll(%s) failed (error %lu)\n", fn, GetLastError() );
+      fn = FS_BuildOSPath( basepath, gamedir, fname );
+      Com_Printf( "Sys_LoadDll(%s)... \n", fn );
+      libHandle = (void*)LoadLibraryA( fn );
+
+      if ( !libHandle )
+      {
+#ifndef NDEBUG
+        Com_Error ( ERR_FATAL, "Sys_LoadDll(%s) failed LoadLibrary completely!\n", name );
+#else
+        Com_Printf ( "Sys_LoadDll(%s) failed LoadLibrary completely!\n", name );
+#endif
+        return NULL;
+      } else
+        Com_Printf ( "Sys_LoadDll(%s): succeeded ...\n", fn );
+    } else
+      Com_Printf ( "Sys_LoadDll(%s): succeeded ...\n", fn );
+  } else
+    Com_Printf ( "Sys_LoadDll(%s): succeeded ...\n", fn );
+
+  dllEntry = (void(*)(int(*)(int,...)))GetProcAddress( (HMODULE)libHandle, "dllEntry" );
+  *entryPoint = (int(*)(int,...))GetProcAddress( (HMODULE)libHandle, "vmMain" );
+  if ( !*entryPoint || !dllEntry )
+  {
+#ifndef NDEBUG
+    Com_Error ( ERR_FATAL, "Sys_LoadDll(%s) failed GetProcAddress(vmMain): error %lu\n", name, GetLastError() );
+#else
+    Com_Printf ( "Sys_LoadDll(%s) failed GetProcAddress(vmMain): error %lu\n", name, GetLastError() );
+#endif
+    FreeLibrary( (HMODULE)libHandle );
+    return NULL;
+  }
+#endif // _WIN32
+
   Com_Printf ( "Sys_LoadDll(%s) found **vmMain** at  %p  \n", name, *entryPoint ); // bk001212
   dllEntry( systemcalls );
   Com_Printf ( "Sys_LoadDll(%s) succeeded!\n", name );
@@ -1156,15 +1190,19 @@ char *Sys_GetClipboardData(void)
 
 void  Sys_Print( const char *msg )
 {
+#ifndef _WIN32
   if (ttycon_on)
   {
     tty_Hide();
   }
+#endif
   fputs(msg, stderr);
+#ifndef _WIN32
   if (ttycon_on)
   {
     tty_Show();
   }
+#endif
 }
 
 
@@ -1232,8 +1270,10 @@ int main ( int argc, char* argv[] )
   void Sys_SetDefaultCDPath(const char *path);
 
   // go back to real user for config loads
+#ifndef _WIN32
   saved_euid = geteuid();
   seteuid(getuid());
+#endif
 
   Sys_ParseArgs( argc, argv );  // bk010104 - added this for support
 
@@ -1260,7 +1300,9 @@ int main ( int argc, char* argv[] )
 
   Sys_ConsoleInputInit();
 
+#ifndef _WIN32
   fcntl(0, F_SETFL, fcntl (0, F_GETFL, 0) | FNDELAY);
+#endif
 	
 #ifdef DEDICATED
 	// init here for dedicated, as we don't have GLimp_Init

@@ -25,9 +25,15 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <stdio.h>
 #include <dirent.h>
 #include <unistd.h>
+#ifndef _WIN32
 #include <sys/mman.h>
+#endif
 #include <sys/time.h>
+#ifndef _WIN32
 #include <pwd.h>
+#else
+#include <direct.h>
+#endif
 
 #include "../game/q_shared.h"
 #include "../qcommon/qcommon.h"
@@ -159,7 +165,11 @@ void Sys_SnapVector( float *v ) { // bk001213 - see win32/win_shared.c
 
 void	Sys_Mkdir( const char *path )
 {
-    mkdir (path, 0777);
+#ifdef _WIN32
+    _mkdir(path);
+#else
+    mkdir(path, 0777);
+#endif
 }
 
 char *strlwr (char *s) {
@@ -387,7 +397,18 @@ char *Sys_DefaultHomePath(void)
 
         if (*homePath)
             return homePath;
-            
+
+#ifdef _WIN32
+	if ((p = getenv("APPDATA")) != NULL) {
+		Q_strncpyz(homePath, p, sizeof(homePath));
+		Q_strcat(homePath, sizeof(homePath), "\\Quake3");
+		if (_mkdir(homePath)) {
+			if (errno != EEXIST)
+				Sys_Error("Unable to create directory \"%s\"\n", homePath);
+		}
+		return homePath;
+	}
+#else
 	if ((p = getenv("HOME")) != NULL) {
 		Q_strncpyz(homePath, p, sizeof(homePath));
 #ifdef MACOS_X
@@ -396,11 +417,12 @@ char *Sys_DefaultHomePath(void)
 		Q_strcat(homePath, sizeof(homePath), "/.q3a");
 #endif
 		if (mkdir(homePath, 0777)) {
-			if (errno != EEXIST) 
+			if (errno != EEXIST)
 				Sys_Error("Unable to create directory \"%s\", error is %s(%d)\n", homePath, strerror(errno), errno);
 		}
 		return homePath;
 	}
+#endif
 	return ""; // assume current dir
 }
 
@@ -417,12 +439,16 @@ void Sys_ShowConsole( int visLevel, qboolean quitOnClose )
 
 char *Sys_GetCurrentUser( void )
 {
+#ifdef _WIN32
+	char *p = getenv("USERNAME");
+	return p ? p : "player";
+#else
 	struct passwd *p;
-
 	if ( (p = getpwuid( getuid() )) == NULL ) {
 		return "player";
 	}
 	return p->pw_name;
+#endif
 }
 
 #if defined(__linux__)

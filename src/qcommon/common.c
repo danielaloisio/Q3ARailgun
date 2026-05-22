@@ -28,7 +28,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #if defined(__linux__) || defined(MACOS_X) || defined(__APPLE__)
 #include <netinet/in.h>
 #else
-#include <winsock.h>
+#include <winsock2.h>
 #endif
 
 int demo_protocols[] =
@@ -2814,7 +2814,7 @@ void Com_Shutdown (void) {
 
 #if !( defined __VECTORC )
 #if !( defined __linux__ || defined __FreeBSD__ )  // r010123 - include FreeBSD 
-#if ((!id386) && (!defined __i386__)) // rcg010212 - for PPC
+#if ((!id386) && (!defined __i386__)) || defined _WIN32 // rcg010212 - for PPC; _WIN32 uses simple path (no MSVC asm)
 
 void Com_Memcpy (void* dest, const void* src, const size_t count)
 {

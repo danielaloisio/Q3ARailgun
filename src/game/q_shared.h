@@ -139,12 +139,20 @@ float	FloatSwap (const float *f);
 #define	CPUSTRING	"win-x86"
 #elif defined _M_ALPHA
 #define	CPUSTRING	"win-AXP"
+#elif defined __x86_64__ || defined _M_X64
+#define	CPUSTRING	"win-x86_64"
+#else
+#define	CPUSTRING	"win-other"
 #endif
 #else
 #ifdef _M_IX86
 #define	CPUSTRING	"win-x86-debug"
 #elif defined _M_ALPHA
 #define	CPUSTRING	"win-AXP-debug"
+#elif defined __x86_64__ || defined _M_X64
+#define	CPUSTRING	"win-x86_64-debug"
+#else
+#define	CPUSTRING	"win-other-debug"
 #endif
 #endif
 
