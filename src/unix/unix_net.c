@@ -256,6 +256,13 @@ void	Sys_SendPacket( int length, const void *data, netadr_t to )
 	ret = sendto (net_socket, data, length, 0, (struct sockaddr *)&addr, sizeof(addr) );
 	if (ret == -1)
 	{
+#ifdef _WIN32
+		int err = WSAGetLastError();
+		// some interfaces (PPP/VPN) don't support broadcast; suppress silently
+		if ( err == WSAEADDRNOTAVAIL &&
+		     ( to.type == NA_BROADCAST || to.type == NA_BROADCAST_IPX ) )
+			return;
+#endif
 		Com_Printf ("NET_SendPacket ERROR: %s to %s\n", NET_ErrorString(),
 				NET_AdrToString (to));
 	}
