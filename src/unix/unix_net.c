@@ -258,7 +258,6 @@ void	Sys_SendPacket( int length, const void *data, netadr_t to )
 	{
 #ifdef _WIN32
 		int err = WSAGetLastError();
-		// some interfaces (PPP/VPN) don't support broadcast; suppress silently
 		if ( err == WSAEADDRNOTAVAIL &&
 		     ( to.type == NA_BROADCAST || to.type == NA_BROADCAST_IPX ) )
 			return;
@@ -643,7 +642,7 @@ void NET_Sleep(int msec)
 	FD_ZERO(&fdset);
 #ifndef _WIN32
 	if (stdin_active)
-		FD_SET(0, &fdset); // stdin is processed too (POSIX only)
+		FD_SET(0, &fdset); // stdin is processed too
 #endif
 	FD_SET(ip_socket, &fdset); // network socket
 	timeout.tv_sec = msec/1000;
