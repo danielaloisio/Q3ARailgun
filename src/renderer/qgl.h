@@ -45,10 +45,15 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "macosx_glimp.h"
 
+#elif defined( __APPLE__ )
+
+#include <OpenGL/gl.h>
+
 #elif defined( __linux__ )
 
 #include <GL/gl.h>
 #include <GL/glx.h>
+
 // bk001129 - from cvs1.17 (mkv)
 #if defined(__FX__)
 #include <GL/fxmesa.h>
@@ -544,7 +549,7 @@ extern BOOL ( WINAPI * qwglSwapIntervalEXT)( int interval );
 
 #endif	// _WIN32
 
-#if ( (defined __linux__ )  || (defined __FreeBSD__ ) ) // rb010123
+#if ( (defined __linux__ )  || (defined __FreeBSD__ ) ) && !defined(__APPLE__) // rb010123
 
 //FX Mesa Functions
 // bk001129 - from cvs1.17 (mkv)

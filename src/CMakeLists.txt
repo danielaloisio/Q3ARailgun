@@ -149,11 +149,14 @@ set(PLATFORM_SRCS
     unix/unix_main.c
     unix/unix_net.c
     unix/unix_shared.c
-    unix/linux_common.c
     unix/linux_signals.c
     sdl/sdl_glimp.c
     sdl/sdl_snd.c
 )
+
+if(NOT APPLE)
+    list(APPEND PLATFORM_SRCS unix/linux_common.c)
+endif()
 
 add_executable(Q3ARailgun
     ${QCOMMON_SRCS}
@@ -231,6 +234,7 @@ set(GAME_SRCS
 add_library(qagame SHARED ${GAME_SRCS})
 target_include_directories(qagame PRIVATE game qcommon)
 target_compile_definitions(qagame PRIVATE GAME)
+target_compile_options(qagame PRIVATE -fno-builtin)
 set_target_properties(qagame PROPERTIES
     PREFIX ""
     OUTPUT_NAME "qagamex86_64"
@@ -267,6 +271,7 @@ set(CGAME_SRCS
 add_library(cgame SHARED ${CGAME_SRCS})
 target_include_directories(cgame PRIVATE cgame game qcommon)
 target_compile_definitions(cgame PRIVATE CGAME)
+target_compile_options(cgame PRIVATE -fno-builtin)
 set_target_properties(cgame PROPERTIES
     PREFIX ""
     OUTPUT_NAME "cgamex86_64"
@@ -283,11 +288,16 @@ list(APPEND UI_SRCS
     game/bg_misc.c
     game/q_math.c
     game/q_shared.c
+    ui/ui_syscalls.c
 )
 
 add_library(ui SHARED ${UI_SRCS})
-target_include_directories(ui PRIVATE q3_ui game qcommon)
+target_include_directories(ui PRIVATE q3_ui ui game qcommon)
 target_compile_definitions(ui PRIVATE UI)
+target_compile_options(ui PRIVATE -fno-builtin)
+if(APPLE)
+    target_link_options(ui PRIVATE -undefined dynamic_lookup)
+endif()
 set_target_properties(ui PROPERTIES
     PREFIX ""
     OUTPUT_NAME "uix86_64"

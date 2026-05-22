@@ -291,6 +291,7 @@ int toupper( int c ) {
 #endif
 //#ifndef _MSC_VER
 
+#if !defined(__APPLE__)
 void *memmove( void *dest, const void *src, size_t count ) {
 	int		i;
 
@@ -305,6 +306,7 @@ void *memmove( void *dest, const void *src, size_t count ) {
 	}
 	return dest;
 }
+#endif
 
 
 #if 0

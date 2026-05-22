@@ -11,11 +11,21 @@ endif()
 find_package(SDL2 REQUIRED)
 find_package(OpenGL REQUIRED)
 
-add_compile_definitions(
-    LINUX
-    __linux__
-    NO_VM_COMPILED
-)
+if(APPLE)
+    add_compile_definitions(
+        NO_VM_COMPILED
+    )
+elseif(UNIX)
+    add_compile_definitions(
+        LINUX
+        __linux__
+        NO_VM_COMPILED
+    )
+else()
+    add_compile_definitions(
+        NO_VM_COMPILED
+    )
+endif()
 
 add_compile_options(
     -Wall

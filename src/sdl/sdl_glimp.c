@@ -468,9 +468,11 @@ void GLimp_LogComment(char *comment)
 }
 
 /* Called by cl_cgame.c — snap float vector components to integers */
+#ifndef __APPLE__
 void Sys_SnapVector(float *v)
 {
     v[0] = (float)(int)v[0];
     v[1] = (float)(int)v[1];
     v[2] = (float)(int)v[2];
 }
+#endif
